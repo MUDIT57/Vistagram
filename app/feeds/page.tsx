@@ -1,26 +1,52 @@
 'use client'
 import { Camera, Clock, X, Upload, Sparkles } from 'lucide-react';
-import { Posts } from "../data/posts"
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
-import OpenAI from 'openai';
+import { Post } from '../type/posts';
+import { collection, addDoc, getDocs } from "firebase/firestore"
+import { db } from '@/utils/firebase.browser';
+import { uploadPosts } from '@/scripts/uploadPosts';
 
 export default function Feeds() {
 
-    // useEffect(()=>{
-    const run = async () => {
-        const client = new OpenAI({
-            apiKey: "api-key",
-            dangerouslyAllowBrowser: true
-        });
-        const response = await client.responses.create({
-            model: "gpt-5-nano",
-            input: "Write a one-sentence bedtime story about a unicorn."
-        })
-        console.log(response.output_text);
+    const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const [stream, setStream] = useState<null | MediaStream>(null);
+    const [imageUrl, setImageUrl] = useState<null | string>(null);
+    const [caption, setCaption] = useState<string>("");
+    const [feeds, setFeeds] = useState<Post[]>([]);
+
+
+    useEffect(() => {
+        const init=async()=>{
+            await uploadPosts();
+            await getPostsFromFirebase();
+        }
+        init();
+    }, [])
+
+    const getPostsFromFirebase = async () => {
+        const postsRef = collection(db, "posts");
+        const snapshot = await getDocs(postsRef);
+        const firebasePosts: Post[] = snapshot.docs.map(snap => snap.data() as Post);
+        setFeeds(firebasePosts);
     }
-    // run();
-    // },[])
+
+    const generateCaption = async () => {
+        const response = await fetch("/api/ai-caption", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                image_url: imageUrl
+            })
+        });
+        const data = await response.json();
+        setCaption(data.caption);
+    }
+
+
 
     function getTimeDifference(postedTime: string): string {
         const currentTimeInSeconds = new Date().getTime() / 1000;
@@ -44,11 +70,6 @@ export default function Feeds() {
 
     }
 
-    const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-    const [stream, setStream] = useState<null | MediaStream>(null);
-    const [imageUrl, setImageUrl] = useState<null | string>(null);
-
     const openCamera = async () => {
         setIsCameraOpen(true);
         try {
@@ -69,6 +90,7 @@ export default function Feeds() {
         setStream(null);
         setIsCameraOpen(false);
         setImageUrl(null);
+        setCaption("");
     }
 
     const capturePhoto = () => {
@@ -80,6 +102,20 @@ export default function Feeds() {
         canvasElement.getContext("2d")?.drawImage(videoElement, 0, 0);
         const photoDataUrl = canvasElement.toDataURL('image/jpeg');
         setImageUrl(photoDataUrl);
+    }
+
+    const updateFeeds = () => {
+        if (!imageUrl)
+            return;
+        const post: Post = {
+            id: feeds.length + 1,
+            username: "newUser",
+            userAvatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
+            image: imageUrl,
+            caption: caption,
+            timestamp: new Date().toISOString()
+        }
+        setFeeds([...feeds, post]);
     }
 
     return <div className='flex flex-col h-screen overflow-hidden'>
@@ -106,13 +142,13 @@ export default function Feeds() {
                     </div> : <div className='p-6'>
                         <div className='flex justify-between items-center'>
                             <span className='text-white text-sm'>Caption</span>
-                            <button onClick={()=>run()} className='cursor-pointer text-white flex  text-sm bg-linear-to-r from-emerald-500 to-teal-500 rounded-2xl border-none px-4 py-2 items-center gap-1'>
+                            <button onClick={() => generateCaption()} className='cursor-pointer text-white flex  text-sm bg-linear-to-r from-emerald-500 to-teal-500 rounded-2xl border-none px-4 py-2 items-center gap-1'>
                                 <Sparkles height={16} width={16} />
                                 AI Generate
                             </button>
                         </div>
-                        <textarea placeholder='Describe your moment...' className='w-full h-32 bg-black/50 rounded-2xl border-cyan-500/30 border mt-2 text-white placeholder-gray-500 p-4 focus:border-cyan-400 focus:outline-none' />
-                        <button className='cursor-pointer mt-2 w-full bg-linear-to-r from-cyan-500 to-blue-500 rounded-4xl p-2 text-white'>Share to Feed</button>
+                        <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder='Describe your moment...' className='w-full h-32 bg-black/50 rounded-2xl border-cyan-500/30 border mt-2 text-white placeholder-gray-500 p-4 focus:border-cyan-400 focus:outline-none' />
+                        <button onClick={() => { closeCamera(); updateFeeds(); }} className='cursor-pointer mt-2 w-full bg-linear-to-r from-cyan-500 to-blue-500 rounded-4xl p-2 text-white'>Share to Feed</button>
                     </div>}
                 </div>
             </div>
@@ -132,7 +168,7 @@ export default function Feeds() {
         <hr className='color-yellow' />
         <div className="bg-linear-to-b from-slate-950 to-blue-950 overflow-y-auto px-20">
             <div className="grid grid-cols-3 gap-8 py-10">
-                {Posts.map((post) => (
+                {feeds.map((post) => (
                     <div key={post.id} className="rounded-3xl overflow-hidden border-[#06B6D41A] border hover:shado-lg hover:shadow-[0px_10px_50px_rgba(6,182,212,0.25)] duration-300">
                         <div className="relative w-full overflow-hidden aspect-4/3">
                             <Image
@@ -159,7 +195,7 @@ export default function Feeds() {
                                 </div>
                             </div>
                         </div>
-                        <div className="p-5 text-white text-sm bg-[#0f193a]">{post.caption}</div>
+                        <div className="p-5 text-white text-sm bg-[#0f193a] h-full wrap-break-word">{post.caption}</div>
                     </div>
                 ))}
             </div>
