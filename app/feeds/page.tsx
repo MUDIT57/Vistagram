@@ -15,10 +15,12 @@ export default function Feeds() {
     const [imageUrl, setImageUrl] = useState<null | string>(null);
     const [caption, setCaption] = useState<string>("");
     const [feeds, setFeeds] = useState<Post[]>([]);
+    const imageInputRef=useRef<HTMLInputElement | null>(null)
+
 
 
     useEffect(() => {
-        const init=async()=>{
+        const init = async () => {
             await uploadPosts();
             await getPostsFromFirebase();
         }
@@ -118,6 +120,25 @@ export default function Feeds() {
         setFeeds([...feeds, post]);
     }
 
+    const triggerImageUploadClick = () => {
+        const doc = imageInputRef.current as HTMLInputElement;
+        doc.click();
+    }
+
+    const handleFileChnage = () => {
+        console.log(imageInputRef);
+        const doc = imageInputRef.current as HTMLInputElement;
+        const [input] = doc.files as FileList;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setImageUrl(e.target?.result as string);
+        }
+        reader.onerror = (e) => {
+            console.log('error found');
+        }
+        reader.readAsDataURL(input);
+    }
+
     return <div className='flex flex-col h-screen overflow-hidden'>
         {isCameraOpen &&
             <div className='fixed inset-0 z-50 flex items-center justify-center backdrop-blur-lg flex-col'>
@@ -126,11 +147,12 @@ export default function Feeds() {
                         <span className='text-2xl font-bold bg-linear-to-r from-cyan-400 to-blue-400 text-transparent bg-clip-text'>Capture Moment</span>
                         <X className='text-white cursor-pointer' onClick={() => closeCamera()} />
                     </div>
-                    {!imageUrl ? <video className='w-full h-100' ref={videoRef} autoPlay id="videoElement"></video> :
-                        <img className='w-full h-100' src={imageUrl} id="photoElement" />}
+                    {!imageUrl ? <video className='w-133 h-100' ref={videoRef} autoPlay id="videoElement"></video> :
+                        <img className='w-133 h-100' src={imageUrl} id="photoElement" />}
                     {!imageUrl ? <div className='p-6 flex flex-col justify-center items-center gap-3 border-t border-cyan-500/20'>
                         <div className='flex gap-4'>
-                            <button className='cursor-pointer text-white flex bg-linear-to-r from-purple-500 to-pink-500 px-6 py-3 justify-center items-center gap-2 rounded-2xl'>
+                            <button onClick={() => triggerImageUploadClick()} id="captureButton" className='cursor-pointer text-white flex bg-linear-to-r from-purple-500 to-pink-500 px-6 py-3 justify-center items-center gap-2 rounded-2xl'>
+                                <input ref={imageInputRef} onChange={() => handleFileChnage()} type="file" id="fileInput" accept="image/*" className="hidden" />
                                 <Upload />
                                 Upload Photo
                             </button>
