@@ -1,7 +1,7 @@
 import Image from "next/image";
-import Feeds from "./feeds/page";
+import Login from "./login/page";
 
 export default function Home() {
-  return <Feeds />
+  return <Login/>
     ;
 }
