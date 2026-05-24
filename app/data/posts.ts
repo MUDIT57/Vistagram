@@ -1,8 +1,9 @@
 import { Post } from "../type/posts";
+import { v4 as uuidv4 } from 'uuid';
 
 export const Posts: Post[] = [
     {
-        "id": 1,
+        "id": uuidv4(),
         "username": "wanderlust_emma",
         "userAvatar": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&h=800&fit=crop",
@@ -10,7 +11,7 @@ export const Posts: Post[] = [
         "timestamp": "2025-12-20T08:30:00Z"
     },
     {
-        "id": 2,
+        "id": uuidv4(),
         "username": "adventure_alex",
         "userAvatar": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&h=800&fit=crop",
@@ -18,7 +19,7 @@ export const Posts: Post[] = [
         "timestamp": "2025-12-20T05:30:00Z"
     },
     {
-        "id": 3,
+        "id": uuidv4(),
         "username": "coastal_vibes",
         "userAvatar": "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=800&h=800&fit=crop",
@@ -26,7 +27,7 @@ export const Posts: Post[] = [
         "timestamp": "2025-12-20T02:30:00Z"
     },
     {
-        "id": 4,
+        "id": uuidv4(),
         "username": "urban_explorer",
         "userAvatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1514565131-fce0801e5785?w=800&h=800&fit=crop",
@@ -34,7 +35,7 @@ export const Posts: Post[] = [
         "timestamp": "2025-12-19T22:30:00Z"
     },
     {
-        "id": 5,
+        "id": uuidv4(),
         "username": "nature_nomad",
         "userAvatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1501594907352-04cda38ebc29?w=800&h=800&fit=crop",
@@ -42,7 +43,7 @@ export const Posts: Post[] = [
         "timestamp": "2025-12-19T08:30:00Z"
     },
     {
-        "id": 6,
+        "id": uuidv4(),
         "username": "mountain_matt",
         "userAvatar": "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&h=800&fit=crop",
@@ -51,7 +52,7 @@ export const Posts: Post[] = [
 
     },
     {
-        "id": 7,
+        "id": uuidv4(),
         "username": "sunset_sarah",
         "userAvatar": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&h=800&fit=crop",
@@ -60,7 +61,7 @@ export const Posts: Post[] = [
 
     },
     {
-        "id": 8,
+        "id": uuidv4(),
         "username": "city_chaser",
         "userAvatar": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=800&h=800&fit=crop",
@@ -69,7 +70,7 @@ export const Posts: Post[] = [
 
     },
     {
-        "id": 9,
+        "id": uuidv4(),
         "username": "historic_hannah",
         "userAvatar": "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1549144511-f099e773c147?w=800&h=800&fit=crop",
@@ -78,7 +79,7 @@ export const Posts: Post[] = [
 
     },
     {
-        "id": 10,
+        "id": uuidv4(),
         "username": "jungle_joe",
         "userAvatar": "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&h=150&fit=crop",
         "image": "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&h=800&fit=crop",

@@ -5,7 +5,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
 import { collection, addDoc, getDocs } from "firebase/firestore"
 import { db } from '@/utils/firebase.browser';
-import { uploadPosts } from '@/scripts/uploadPosts';
+import { uploadPostsToFirebase } from '@/scripts/uploadPostsToFirebase';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function Feeds() {
 
@@ -15,13 +16,11 @@ export default function Feeds() {
     const [imageUrl, setImageUrl] = useState<null | string>(null);
     const [caption, setCaption] = useState<string>("");
     const [feeds, setFeeds] = useState<Post[]>([]);
-    const imageInputRef=useRef<HTMLInputElement | null>(null)
-
-
+    const imageInputRef = useRef<HTMLInputElement | null>(null)
 
     useEffect(() => {
         const init = async () => {
-            await uploadPosts();
+            await uploadPostsToFirebase();
             await getPostsFromFirebase();
         }
         init();
@@ -47,7 +46,6 @@ export default function Feeds() {
         const data = await response.json();
         setCaption(data.caption);
     }
-
 
 
     function getTimeDifference(postedTime: string): string {
@@ -106,18 +104,22 @@ export default function Feeds() {
         setImageUrl(photoDataUrl);
     }
 
-    const updateFeeds = () => {
+    const generateUniqueId = (): string => uuidv4();
+
+    const updateFeeds = async () => {
         if (!imageUrl)
             return;
         const post: Post = {
-            id: feeds.length + 1,
+            id: generateUniqueId(),
             username: "newUser",
             userAvatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
             image: imageUrl,
             caption: caption,
             timestamp: new Date().toISOString()
-        }
-        setFeeds([...feeds, post]);
+        };
+        await addDoc(collection(db, "posts"), post);
+        getPostsFromFirebase();
+
     }
 
     const triggerImageUploadClick = () => {
