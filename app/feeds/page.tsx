@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
 import { collection, addDoc, getDocs } from "firebase/firestore"
 import { db } from '@/utils/firebase.browser';
-import { uploadPosts } from '@/scripts/uploadPosts';
+import { uploadPostsToFirebase } from '@/scripts/uploadPostsToFirebase';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function Feeds() {
@@ -20,7 +20,7 @@ export default function Feeds() {
 
     useEffect(() => {
         const init = async () => {
-            await uploadPosts();
+            await uploadPostsToFirebase();
             await getPostsFromFirebase();
         }
         init();
