@@ -10,3 +10,4 @@ export const uploadPostsToFirebase=async()=>{
         await addDoc(collection(db,"posts"),post);
     }
 }
+

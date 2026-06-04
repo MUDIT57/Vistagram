@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
 import { collection, addDoc, getDocs } from "firebase/firestore"
 import { db } from '@/utils/firebase.browser';
-import { uploadPostsToFirebase } from '@/scripts/uploadPostsToFirebase';
+import { uploadPostsToFirebase } from '@/scripts/uploadPosts';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function Feeds() {
