@@ -1,18 +1,124 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Image from "next/image";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { db } from "@/utils/firebase.browser";
+import { collection, addDoc, getDocs } from "firebase/firestore"
+import { User, SignUpErrors,SignInErrors } from "../type/auth";
+import { uploadUsersToFirebase } from "@/scripts/uploadUsers";
+import { redirect } from "next/navigation";
 
 export default function Login() {
 
     const [activeTab, setActiveTab] = useState<string>("Sign In");
     const [hidePassword, setHidePassword] = useState<boolean>(true);
     const [hideConfirmedPassword, setHideConfirmedPassword] = useState<boolean>(true);
+    const [signUpEmail, setSignUpEmail] = useState<string>("");
+    const [signUpPassword, setSignUpPassword] = useState<string>("");
+    const [signUpUserName, setsignUpUserName] = useState<string>("");
+    const [signUpconfirmPassword,setSignUpconfirmPassword]=useState<string>("");
+    const [signInPassword, setSignInPassword] = useState<string>("");
+    const [signInEmailOrUsername,setSignInEmailOrUsername]=useState<string>("");
+    const [users, setUsers] = useState<User[]>([]);
+    const [signUpErrors, setSignUpErrors] = useState<SignUpErrors>({
+        emailError: "",
+        passwordError: "",
+        userNameError: "",
+        confirmPasswordError: ""
+    })
+    const [signInErrors,setSignInErrors]=useState<SignInErrors>({
+        usernameOrEmailError: "",
+        passwordError: "",
+    })
 
     const toggleHidePassword = () => setHidePassword(hidePassword => !hidePassword)
     const toggleHideConfirmedPassword = () => setHideConfirmedPassword(hideComfirmedPassword => !hideComfirmedPassword)
-
     const isSignInTabSelected = () => activeTab === "Sign In";
+
+    useEffect(() => {
+        const init = async () => {
+            await uploadUsersToFirebase();
+            await getUsersFromFirebase();
+        }
+        init();
+    })
+
+    const getUsersFromFirebase = async () => {
+        const usersRef = collection(db, "users");
+        const snapshot = await getDocs(usersRef);
+        const firebaseUsers: User[] = snapshot.docs.map(snap => snap.data() as User);
+        setUsers(firebaseUsers);
+    }
+
+    const handleSignUpReset = () => {
+        setSignUpErrors(() => ({
+            emailError: "",
+            passwordError: "",
+            userNameError: "",
+            confirmPasswordError: ""
+        }))
+    }
+
+    const handleSignInReset = () => {
+        setSignInErrors(() => ({
+            usernameOrEmailError: "",
+            passwordError: "",
+        }))
+    }
+
+    const isValidCredentials = (): [boolean, boolean] => {
+        let [isUsernameOrEmailValid, isPasswordValid] = [false, false];
+        for (const user of users) {
+            if (user.email === signInEmailOrUsername)
+                isUsernameOrEmailValid = true;
+            if (user.password === signInPassword)
+                isPasswordValid = true;
+            if (user.userName === signInEmailOrUsername)
+                isUsernameOrEmailValid = true;
+        }
+        return [isUsernameOrEmailValid, isPasswordValid];
+    }
+
+    const handleSignIn = () => {
+        handleSignInReset();
+        if (signInEmailOrUsername.length === 0 || signInPassword.length === 0) {
+            if (signInEmailOrUsername.length === 0) {
+                setSignInErrors((errors) => { return { ...errors, usernameOrEmailError: "Please enter your username or email" } });
+            }
+            if (signInPassword.length === 0) {
+                setSignInErrors((errors) => { return { ...errors, passwordError: "Please enter your password" } });
+            }
+            return;
+        }
+        const [isUsernameOrEmailValid, isPasswordValid] = isValidCredentials();
+        if (!isUsernameOrEmailValid)
+            setSignInErrors((errors) => { return { ...errors, usernameOrEmailError: "Email does not exist" } });
+        else if (!isPasswordValid)
+            setSignInErrors((errors) => { return { ...errors, passwordError: "The password you entered is incorrect" } });
+        else
+            redirect("/feeds");
+    }
+
+    const handleSignOut=()=>{
+        handleSignUpReset();
+        if (signUpEmail.length === 0 || signUpPassword.length === 0 || signUpUserName.length===0 || signUpconfirmPassword.length===0) {
+            if (signUpEmail.length === 0) {
+                setSignUpErrors((errors) => { return { ...errors, emailError: "Please enter your email" } });
+            }
+            if (signUpPassword.length === 0) {
+                setSignUpErrors((errors) => { return { ...errors, passwordError: "Please enter your password" } });
+            }
+            if(signUpUserName.length===0){
+                setSignUpErrors((errors)=>{return {...errors,userNameError:"Please enter your username"}});
+            }
+            if(signUpconfirmPassword.length===0){
+                setSignUpErrors((errors)=>{return {...errors,confirmPasswordError:"Please re-enter your password"}});
+            }
+            return;
+        }
+        if(signUpPassword===signUpconfirmPassword)
+            addDoc(collection(db,"users"),{signUpEmail,signUpPassword});
+    }
 
     return <div className="h-screen w-screen bg-linear-to-r from-slate-950 via-blue-950 to-slate-950 flex overflow-scroll">
         <div className="m-auto gap-5 flex flex-col">
@@ -29,21 +135,23 @@ export default function Login() {
                     activeTab === "Sign In" ? <div className="gap-6 flex flex-col">
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Email</span>
+                                <span className="text-sm text-[#CBD5E1]">Username or Email</span>
                                 <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center pl-4">
                                     <Mail className="text-[#64748B]" size={22} />
-                                    <input placeholder="Enter your email" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                                    <input value={signInEmailOrUsername} onChange={(e) => setSignInEmailOrUsername(e.target.value)} placeholder="Enter your username or email" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
                                 </div>
+                                <span className="text-red-500">{signInErrors.usernameOrEmailError}</span>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm text-[#CBD5E1]">Password</span>
                                 <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
                                     <Lock className="text-[#64748B]" size={22} />
-                                    <input placeholder="Enter your password" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                                    <input value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} placeholder="Enter your password" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
                                     <div onClick={() => toggleHidePassword()}>
                                         {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
                                     </div>
                                 </div>
+                                <span className="text-red-500">{signInErrors.passwordError}</span>
                             </div>
                         </div>
                         <div className="flex justify-between">
@@ -53,40 +161,44 @@ export default function Login() {
                             </div>
                             <span className="text-sm text-cyan-400 hover:text-cyan-300 cursor-pointer">Forgot Password?</span>
                         </div>
-                        <button onClick={() => setActiveTab("Sign In")} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Sign In</button>
+                        <button onClick={() => handleSignIn()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Sign In</button>
 
                     </div> : <div className="gap-6 flex flex-col">
                         <div className="flex flex-col gap-4">
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm text-[#CBD5E1]">Username</span>
-                                <input placeholder="Enter your username" className="bg-[#1E293B]/50 placeholder:text-[#64748B] text-white border border-slate-700 rounded-lg p-3 px-4" />
+                                <input value={signUpUserName} onChange={(e)=>setsignUpUserName(e.target.value)} placeholder="Enter your username" className="bg-[#1E293B]/50 placeholder:text-[#64748B] text-white border border-slate-700 rounded-lg p-3 px-4" />
+                                <span className="text-red-500">{signUpErrors.userNameError}</span>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm text-[#CBD5E1]">Email</span>
                                 <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
                                     <Mail className="text-[#64748B]" size={22} />
-                                    <input placeholder="Enter your email" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                                    <input value={signUpEmail} onChange={(e)=>setSignUpEmail(e.target.value)} placeholder="Enter your email" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
                                 </div>
+                                <span className="text-red-500">{signUpErrors.emailError}</span>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm text-[#CBD5E1]">Password</span>
                                 <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
                                     <Lock className="text-[#64748B]" size={22} />
-                                    <input placeholder="Enter your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                                    <input value={signUpPassword} onChange={(e)=>setSignUpPassword(e.target.value)} placeholder="Enter your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
                                     <div onClick={() => toggleHidePassword()}>
                                         {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
                                     </div>
                                 </div>
+                                <span className="text-red-500">{signUpErrors.passwordError}</span>
                             </div>
                             <div className="flex flex-col gap-2">
                                 <span className="text-sm text-[#CBD5E1]">Confirm Password</span>
                                 <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
                                     <Lock className="text-[#64748B]" size={22} />
-                                    <input placeholder="Confirm your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                                    <input value={signUpconfirmPassword} onChange={(e)=>setSignUpconfirmPassword(e.target.value)} placeholder="Confirm your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
                                     <div onClick={() => toggleHideConfirmedPassword()}>
                                         {hideConfirmedPassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
                                     </div>
                                 </div>
+                                <span className="text-red-500">{signUpErrors.confirmPasswordError}</span>
                             </div>
                         </div>
                         {activeTab === "Sign In" && <div className="flex justify-between">
@@ -96,7 +208,7 @@ export default function Login() {
                             </div>
                             <span className="text-sm text-cyan-400 hover:text-cyan-300">Forgot Password?</span>
                         </div>}
-                        <button onClick={() => setActiveTab("Sign In")} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Create Account</button>
+                        <button onClick={()=>handleSignOut()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Create Account</button>
 
                     </div>
                 }

@@ -1,6 +1,5 @@
-import Feeds from "./feeds/page";
+import {redirect} from "next/navigation";
 
 export default function Home() {
-  return <Feeds/>
-    ;
+  redirect("/login");
 }
