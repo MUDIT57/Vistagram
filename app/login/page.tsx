@@ -1,12 +1,11 @@
 "use client"
-import { useEffect, useState } from "react"
+import { JSX, useEffect, useState } from "react"
 import Image from "next/image";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
-import { db } from "@/utils/firebase.browser";
-import { collection, addDoc, getDocs } from "firebase/firestore"
-import { User, SignUpErrors,SignInErrors } from "../type/auth";
-import { uploadUsersToFirebase } from "@/scripts/uploadUsers";
+import { User, SignUpErrors, SignInErrors } from "../type/auth";
+import { uploadUsers } from "@/scripts/uploadUsers";
 import { redirect } from "next/navigation";
+import { firebaseService } from "@/services/firebaseService";
 
 export default function Login() {
 
@@ -16,9 +15,9 @@ export default function Login() {
     const [signUpEmail, setSignUpEmail] = useState<string>("");
     const [signUpPassword, setSignUpPassword] = useState<string>("");
     const [signUpUserName, setsignUpUserName] = useState<string>("");
-    const [signUpconfirmPassword,setSignUpconfirmPassword]=useState<string>("");
+    const [signUpconfirmPassword, setSignUpconfirmPassword] = useState<string>("");
     const [signInPassword, setSignInPassword] = useState<string>("");
-    const [signInEmailOrUsername,setSignInEmailOrUsername]=useState<string>("");
+    const [signInEmailOrUsername, setSignInEmailOrUsername] = useState<string>("");
     const [users, setUsers] = useState<User[]>([]);
     const [signUpErrors, setSignUpErrors] = useState<SignUpErrors>({
         emailError: "",
@@ -26,7 +25,7 @@ export default function Login() {
         userNameError: "",
         confirmPasswordError: ""
     })
-    const [signInErrors,setSignInErrors]=useState<SignInErrors>({
+    const [signInErrors, setSignInErrors] = useState<SignInErrors>({
         usernameOrEmailError: "",
         passwordError: "",
     })
@@ -37,17 +36,15 @@ export default function Login() {
 
     useEffect(() => {
         const init = async () => {
-            await uploadUsersToFirebase();
-            await getUsersFromFirebase();
+            await uploadUsers();
+            await getUsers();
         }
         init();
-    })
+    }, [])
 
-    const getUsersFromFirebase = async () => {
-        const usersRef = collection(db, "users");
-        const snapshot = await getDocs(usersRef);
-        const firebaseUsers: User[] = snapshot.docs.map(snap => snap.data() as User);
-        setUsers(firebaseUsers);
+    const getUsers = async () => {
+        const data = await firebaseService.getAll<User>("users");
+        setUsers(data);
     }
 
     const handleSignUpReset = () => {
@@ -99,25 +96,104 @@ export default function Login() {
             redirect("/feeds");
     }
 
-    const handleSignOut=()=>{
+    const handleSignOut = () => {
         handleSignUpReset();
-        if (signUpEmail.length === 0 || signUpPassword.length === 0 || signUpUserName.length===0 || signUpconfirmPassword.length===0) {
+        if (signUpEmail.length === 0 || signUpPassword.length === 0 || signUpUserName.length === 0 || signUpconfirmPassword.length === 0) {
             if (signUpEmail.length === 0) {
                 setSignUpErrors((errors) => { return { ...errors, emailError: "Please enter your email" } });
             }
             if (signUpPassword.length === 0) {
                 setSignUpErrors((errors) => { return { ...errors, passwordError: "Please enter your password" } });
             }
-            if(signUpUserName.length===0){
-                setSignUpErrors((errors)=>{return {...errors,userNameError:"Please enter your username"}});
+            if (signUpUserName.length === 0) {
+                setSignUpErrors((errors) => { return { ...errors, userNameError: "Please enter your username" } });
             }
-            if(signUpconfirmPassword.length===0){
-                setSignUpErrors((errors)=>{return {...errors,confirmPasswordError:"Please re-enter your password"}});
+            if (signUpconfirmPassword.length === 0) {
+                setSignUpErrors((errors) => { return { ...errors, confirmPasswordError: "Please re-enter your password" } });
             }
             return;
         }
-        if(signUpPassword===signUpconfirmPassword)
-            addDoc(collection(db,"users"),{signUpEmail,signUpPassword});
+        if (signUpPassword === signUpconfirmPassword)
+            firebaseService.add("users", { email: signUpEmail, password: signUpPassword, userName: signUpUserName } as User)
+    }
+
+    function SignIn(): JSX.Element {
+        return <div className="gap-6 flex flex-col">
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Username or Email</span>
+                    <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center pl-4">
+                        <Mail className="text-[#64748B]" size={22} />
+                        <input value={signInEmailOrUsername} onChange={(e) => setSignInEmailOrUsername(e.target.value)} placeholder="Enter your username or email" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                    </div>
+                    <span className="text-red-500">{signInErrors.usernameOrEmailError}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Password</span>
+                    <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
+                        <Lock className="text-[#64748B]" size={22} />
+                        <input value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} placeholder="Enter your password" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                        <div onClick={() => toggleHidePassword()}>
+                            {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
+                        </div>
+                    </div>
+                    <span className="text-red-500">{signInErrors.passwordError}</span>
+                </div>
+            </div>
+            <div className="flex justify-between">
+                <div className="flex items-center gap-1.5">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <span className="text-slate-400 text-sm">Remember me</span>
+                </div>
+                <span className="text-sm text-cyan-400 hover:text-cyan-300 cursor-pointer">Forgot Password?</span>
+            </div>
+            <button onClick={() => handleSignIn()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Sign In</button>
+
+        </div>;
+    }
+
+    function SignOut(): JSX.Element {
+        return <div className="gap-6 flex flex-col">
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Username</span>
+                    <input value={signUpUserName} onChange={(e) => setsignUpUserName(e.target.value)} placeholder="Enter your username" className="bg-[#1E293B]/50 placeholder:text-[#64748B] text-white border border-slate-700 rounded-lg p-3 px-4" />
+                    <span className="text-red-500">{signUpErrors.userNameError}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Email</span>
+                    <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
+                        <Mail className="text-[#64748B]" size={22} />
+                        <input value={signUpEmail} onChange={(e) => setSignUpEmail(e.target.value)} placeholder="Enter your email" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                    </div>
+                    <span className="text-red-500">{signUpErrors.emailError}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Password</span>
+                    <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
+                        <Lock className="text-[#64748B]" size={22} />
+                        <input value={signUpPassword} onChange={(e) => setSignUpPassword(e.target.value)} placeholder="Enter your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                        <div onClick={() => toggleHidePassword()}>
+                            {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
+                        </div>
+                    </div>
+                    <span className="text-red-500">{signUpErrors.passwordError}</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                    <span className="text-sm text-[#CBD5E1]">Confirm Password</span>
+                    <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
+                        <Lock className="text-[#64748B]" size={22} />
+                        <input value={signUpconfirmPassword} onChange={(e) => setSignUpconfirmPassword(e.target.value)} placeholder="Confirm your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
+                        <div onClick={() => toggleHideConfirmedPassword()}>
+                            {hideConfirmedPassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
+                        </div>
+                    </div>
+                    <span className="text-red-500">{signUpErrors.confirmPasswordError}</span>
+                </div>
+            </div>
+            <button onClick={() => handleSignOut()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Create Account</button>
+
+        </div>
     }
 
     return <div className="h-screen w-screen bg-linear-to-r from-slate-950 via-blue-950 to-slate-950 flex overflow-scroll">
@@ -132,105 +208,15 @@ export default function Login() {
                     <button onClick={() => setActiveTab("Sign Out")} className={`cursor-pointer py-3 px-12 rounded-xl text-[#94A3B8] font-bold text-lg ${!isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : ""}`}>Sign Up</button>
                 </div>
                 {
-                    activeTab === "Sign In" ? <div className="gap-6 flex flex-col">
-                        <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Username or Email</span>
-                                <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center pl-4">
-                                    <Mail className="text-[#64748B]" size={22} />
-                                    <input value={signInEmailOrUsername} onChange={(e) => setSignInEmailOrUsername(e.target.value)} placeholder="Enter your username or email" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
-                                </div>
-                                <span className="text-red-500">{signInErrors.usernameOrEmailError}</span>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Password</span>
-                                <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
-                                    <Lock className="text-[#64748B]" size={22} />
-                                    <input value={signInPassword} onChange={(e) => setSignInPassword(e.target.value)} placeholder="Enter your password" className="w-full placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
-                                    <div onClick={() => toggleHidePassword()}>
-                                        {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
-                                    </div>
-                                </div>
-                                <span className="text-red-500">{signInErrors.passwordError}</span>
-                            </div>
-                        </div>
-                        <div className="flex justify-between">
-                            <div className="flex items-center gap-1.5">
-                                <input type="checkbox" className="w-4 h-4" />
-                                <span className="text-slate-400 text-sm">Remember me</span>
-                            </div>
-                            <span className="text-sm text-cyan-400 hover:text-cyan-300 cursor-pointer">Forgot Password?</span>
-                        </div>
-                        <button onClick={() => handleSignIn()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Sign In</button>
-
-                    </div> : <div className="gap-6 flex flex-col">
-                        <div className="flex flex-col gap-4">
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Username</span>
-                                <input value={signUpUserName} onChange={(e)=>setsignUpUserName(e.target.value)} placeholder="Enter your username" className="bg-[#1E293B]/50 placeholder:text-[#64748B] text-white border border-slate-700 rounded-lg p-3 px-4" />
-                                <span className="text-red-500">{signUpErrors.userNameError}</span>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Email</span>
-                                <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
-                                    <Mail className="text-[#64748B]" size={22} />
-                                    <input value={signUpEmail} onChange={(e)=>setSignUpEmail(e.target.value)} placeholder="Enter your email" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
-                                </div>
-                                <span className="text-red-500">{signUpErrors.emailError}</span>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Password</span>
-                                <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
-                                    <Lock className="text-[#64748B]" size={22} />
-                                    <input value={signUpPassword} onChange={(e)=>setSignUpPassword(e.target.value)} placeholder="Enter your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
-                                    <div onClick={() => toggleHidePassword()}>
-                                        {hidePassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
-                                    </div>
-                                </div>
-                                <span className="text-red-500">{signUpErrors.passwordError}</span>
-                            </div>
-                            <div className="flex flex-col gap-2">
-                                <span className="text-sm text-[#CBD5E1]">Confirm Password</span>
-                                <div className="flex border border-slate-700 bg-[#1E293B]/50 rounded-lg items-center px-4">
-                                    <Lock className="text-[#64748B]" size={22} />
-                                    <input value={signUpconfirmPassword} onChange={(e)=>setSignUpconfirmPassword(e.target.value)} placeholder="Confirm your password" className="w-full  placeholder:text-[#64748B] text-white border border-none  p-3 px-4 focus:outline-none" />
-                                    <div onClick={() => toggleHideConfirmedPassword()}>
-                                        {hideConfirmedPassword ? <EyeOff className="text-[#64748B]" size={22} /> : <Eye className="text-[#64748B]" size={22} />}
-                                    </div>
-                                </div>
-                                <span className="text-red-500">{signUpErrors.confirmPasswordError}</span>
-                            </div>
-                        </div>
-                        {activeTab === "Sign In" && <div className="flex justify-between">
-                            <div className="flex items-center gap-1.5">
-                                <input type="checkbox" className="w-4 h-4" />
-                                <span className="text-slate-400 text-sm">Remember me</span>
-                            </div>
-                            <span className="text-sm text-cyan-400 hover:text-cyan-300">Forgot Password?</span>
-                        </div>}
-                        <button onClick={()=>handleSignOut()} className={`cursor-pointer py-3 px-12 rounded-xl font-bold text-lg text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] hover:shadow-md hover:scale-105 duration-200 shadow-[#06B6D4]/50`}>Create Account</button>
-
-                    </div>
+                    activeTab === "Sign In" ? <SignIn /> : <SignOut />
                 }
                 <div className="flex items-center gap-3">
                     <div className="bg-slate-700 h-px w-full"></div>
                     <span className="text-sm whitespace-nowrap text-slate-500">Or continue with</span>
                     <div className="bg-slate-700 h-px w-full"></div>
                 </div>
-                <div className="flex gap-5 border border-">
-                    <button className="cursor-pointer w-full flex py-3 bg-[#1E293B]/50 border border-[#06B6D4]/20 rounded-xl justify-center"><Image alt="google logo" src="/images/google.png" height={20} width={20} /></button>
-                    <button className="cursor-pointer w-full flex py-3 bg-[#1E293B]/50 border border-[#06B6D4]/20 rounded-xl justify-center"><Image className="" alt="github logo" src="/images/github.png" height={20} width={20} /></button>
-                </div>
+                <button className="cursor-pointer w-full flex py-3 bg-[#1E293B]/50 border border-[#06B6D4]/20 rounded-xl justify-center"><Image alt="google logo" src="/images/google.png" height={20} width={20} /></button>
             </div>
-            {activeTab === "Sign In" ? <div className="flex items-center gap-2 m-auto">
-                <span className="text-sm text-slate-500">Dont't have an account?</span>
-                <span onClick={() => setActiveTab("Sign Out")} className="cursor-pointer text-cyan-400 hover:text-cyan-300 text-[14px]">Sign Up</span>
-            </div> :
-                <div className="flex items-center gap-2 m-auto">
-                    <span className="text-sm text-slate-500">Already have an account?</span>
-                    <span onClick={() => setActiveTab("Sign In")} className="cursor-pointer text-cyan-400 hover:text-cyan-300 text-[14px]">Sign In</span>
-                </div>
-            }
         </div>
     </div>
 }
