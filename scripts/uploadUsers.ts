@@ -1,12 +1,11 @@
 import { Users } from "@/app/data/usersAuth"
-import { db } from "@/utils/firebase.browser";
-import { addDoc, collection, getDocs } from "firebase/firestore";
+import {firebaseService} from "@/services/firebaseService"
 
-export const uploadUsersToFirebase=async()=>{
-    const data= await getDocs(collection(db,"users"));
-    if(data.docs.length!=0)
+export const uploadUsers=async()=>{
+    const data=await firebaseService.getAll("users");
+    if(data.length!=0)
         return ;
     for(const user of Users){
-        await addDoc(collection(db,"users"),user);
+        await firebaseService.add("users",user);
     }
 }

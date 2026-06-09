@@ -3,10 +3,9 @@ import { Camera, Clock, X, Upload, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
-import { collection, addDoc, getDocs } from "firebase/firestore"
-import { db } from '@/utils/firebase.browser';
-import { uploadPostsToFirebase } from '@/scripts/uploadPosts';
+import { uploadPosts } from '@/scripts/uploadPosts';
 import { v4 as uuidv4 } from 'uuid';
+import { firebaseService } from '@/services/firebaseService';
 
 export default function Feeds() {
 
@@ -20,17 +19,15 @@ export default function Feeds() {
 
     useEffect(() => {
         const init = async () => {
-            await uploadPostsToFirebase();
-            await getPostsFromFirebase();
+            await uploadPosts();
+            await getPosts();
         }
         init();
     }, [])
 
-    const getPostsFromFirebase = async () => {
-        const postsRef = collection(db, "posts");
-        const snapshot = await getDocs(postsRef);
-        const firebasePosts: Post[] = snapshot.docs.map(snap => snap.data() as Post);
-        setFeeds(firebasePosts);
+    const getPosts= async () => {
+        const data=await firebaseService.getAll<Post>("posts");
+        setFeeds(data);
     }
 
     const generateCaption = async () => {
@@ -117,8 +114,8 @@ export default function Feeds() {
             caption: caption,
             timestamp: new Date().toISOString()
         };
-        await addDoc(collection(db, "posts"), post);
-        getPostsFromFirebase();
+        await firebaseService.add("posts",post);
+        getPosts();
 
     }
 

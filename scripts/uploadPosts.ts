@@ -1,13 +1,12 @@
 import { Posts } from "@/app/data/posts";
-import { db } from "@/utils/firebase.browser";
-import { addDoc, collection, getDocs } from "firebase/firestore";
+import { firebaseService } from "@/services/firebaseService";
 
-export const uploadPostsToFirebase=async()=>{
-    const data= await getDocs(collection(db,"posts"));
-    if(data.docs.length!=0)
+export const uploadPosts=async()=>{
+    const data=await firebaseService.getAll("posts");
+    if(data.length!=0)
         return ;
     for(const post of Posts){
-        await addDoc(collection(db,"posts"),post);
+        await firebaseService.add("posts",post);
     }
 }
 
