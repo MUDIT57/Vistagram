@@ -3,7 +3,6 @@ import { Camera, Clock, X, Upload, Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
-import { uploadPosts } from '@/scripts/uploadPosts';
 import { v4 as uuidv4 } from 'uuid';
 import { firebaseService } from '@/services/firebaseService';
 
@@ -17,16 +16,8 @@ export default function Feeds() {
     const [feeds, setFeeds] = useState<Post[]>([]);
     const imageInputRef = useRef<HTMLInputElement | null>(null)
 
-    useEffect(() => {
-        const init = async () => {
-            await uploadPosts();
-            await getPosts();
-        }
-        init();
-    }, [])
-
-    const getPosts= async () => {
-        const data=await firebaseService.getAll<Post>("posts");
+    const getPosts = async () => {
+        const data = await firebaseService.getAll<Post>("posts");
         setFeeds(data);
     }
 
@@ -43,7 +34,6 @@ export default function Feeds() {
         const data = await response.json();
         setCaption(data.caption);
     }
-
 
     function getTimeDifference(postedTime: string): string {
         const currentTimeInSeconds = new Date().getTime() / 1000;
@@ -114,7 +104,7 @@ export default function Feeds() {
             caption: caption,
             timestamp: new Date().toISOString()
         };
-        await firebaseService.add("posts",post);
+        await firebaseService.add("posts", post);
         getPosts();
 
     }
@@ -133,7 +123,7 @@ export default function Feeds() {
             setImageUrl(e.target?.result as string);
         }
         reader.onerror = (e) => {
-            console.log('error found');
+            console.log('error found: ', e);
         }
         reader.readAsDataURL(input);
     }
@@ -147,7 +137,7 @@ export default function Feeds() {
                         <X className='text-white cursor-pointer' onClick={() => closeCamera()} />
                     </div>
                     {!imageUrl ? <video className='w-133 h-100' ref={videoRef} autoPlay id="videoElement"></video> :
-                        <img className='w-133 h-100' src={imageUrl} id="photoElement" />}
+                        <Image alt="faceCam" className='w-133 h-100' src={imageUrl} id="photoElement" />}
                     {!imageUrl ? <div className='p-6 flex flex-col justify-center items-center gap-3 border-t border-cyan-500/20'>
                         <div className='flex gap-4'>
                             <button onClick={() => triggerImageUploadClick()} id="captureButton" className='cursor-pointer text-white flex bg-linear-to-r from-purple-500 to-pink-500 px-6 py-3 justify-center items-center gap-2 rounded-2xl'>
