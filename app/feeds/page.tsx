@@ -5,20 +5,31 @@ import { useEffect, useRef, useState } from 'react';
 import { Post } from '../type/posts';
 import { v4 as uuidv4 } from 'uuid';
 import { firebaseService } from '@/services/firebaseService';
+import { useDispatch ,useSelector} from 'react-redux'
+import { add,setPosts } from "@/lib/redux/features/data/dataSlice";
+import {RootState} from "@/lib/redux/store"
 
 export default function Feeds() {
 
+    const dispatch = useDispatch();
+    const feeds=useSelector((state:RootState)=>state.fetch)
+
+    useEffect(() => {
+        getPosts();
+    }, [])
+                
     const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const [stream, setStream] = useState<null | MediaStream>(null);
     const [imageUrl, setImageUrl] = useState<null | string>(null);
     const [caption, setCaption] = useState<string>("");
-    const [feeds, setFeeds] = useState<Post[]>([]);
+    // const [feeds, setFeeds] = useState<Post[]>([]);
     const imageInputRef = useRef<HTMLInputElement | null>(null)
 
     const getPosts = async () => {
         const data = await firebaseService.getAll<Post>("posts");
-        setFeeds(data);
+        // setFeeds(data);
+        dispatch(setPosts(data))
     }
 
     const generateCaption = async () => {
@@ -104,6 +115,7 @@ export default function Feeds() {
             caption: caption,
             timestamp: new Date().toISOString()
         };
+        dispatch(add(post));
         await firebaseService.add("posts", post);
         getPosts();
 
@@ -128,7 +140,7 @@ export default function Feeds() {
         reader.readAsDataURL(input);
     }
 
-    return <div className='flex flex-col h-screen overflow-hidden'>
+    return <div className='flex flex-col overflow-hidden'>
         {isCameraOpen &&
             <div className='fixed inset-0 z-50 flex items-center justify-center backdrop-blur-lg flex-col'>
                 <div className='border rounded-4xl overflow-hidden bg-linear-to-r from-slate-900 to-blue-900 border-cyan-500/30'>
@@ -137,7 +149,7 @@ export default function Feeds() {
                         <X className='text-white cursor-pointer' onClick={() => closeCamera()} />
                     </div>
                     {!imageUrl ? <video className='w-133 h-100' ref={videoRef} autoPlay id="videoElement"></video> :
-                        <Image alt="faceCam" className='w-133 h-100' src={imageUrl} id="photoElement" />}
+                        <Image height={30} width={30} alt="faceCam" className='w-133 h-100' src={imageUrl} id="photoElement" />}
                     {!imageUrl ? <div className='p-6 flex flex-col justify-center items-center gap-3 border-t border-cyan-500/20'>
                         <div className='flex gap-4'>
                             <button onClick={() => triggerImageUploadClick()} id="captureButton" className='cursor-pointer text-white flex bg-linear-to-r from-purple-500 to-pink-500 px-6 py-3 justify-center items-center gap-2 rounded-2xl'>
@@ -177,7 +189,7 @@ export default function Feeds() {
             </div>
         </header>
         <hr className='color-yellow' />
-        <div className="bg-linear-to-b from-slate-950 to-blue-950 overflow-y-auto px-20">
+        <div className="bg-linear-to-b from-slate-950 to-blue-950 overflow-y-auto px-20 h-screen">
             <div className="grid grid-cols-3 gap-8 py-10">
                 {feeds.map((post) => (
                     <div key={post.id} className="rounded-3xl overflow-hidden border-[#06B6D41A] border hover:shado-lg hover:shadow-[0px_10px_50px_rgba(6,182,212,0.25)] duration-300">
