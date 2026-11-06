@@ -85,7 +85,7 @@ function SignUp(): JSX.Element {
 
     const handleSignUp = async () => {
         try {
-            await signUp(signUpEmail, signUpPassword, signUpUserName);
+            await signUp(signUpEmail, signUpPassword,signUpconfirmPassword, signUpUserName);
         } catch {
             console.log("Error in Sign Up");
         }
@@ -173,8 +173,8 @@ export default function Login() {
                         Discover & Share Points of Interest
                     </span>
                 </div>
-                <div className="flex flex-col gap-6 bg-surface/80 backdrop-blur-sm shadow-xl shadow-blue-200/50 dark:shadow-none border border-border rounded-3xl p-8">
-                    <div className="bg-surface-muted/50 flex gap-10 rounded-xl">
+                <div className="max-w-md flex flex-col gap-6 bg-surface/80 backdrop-blur-sm shadow-xl shadow-blue-200/50 dark:shadow-none border border-border rounded-3xl p-8">
+                    <div className="bg-surface-muted/50 gap-10 rounded-xl flex justify-between">
                         <button
                             onClick={() => setActiveTab("Sign In")}
                             className={`cursor-pointer px-7 py-3 lg:py-3 lg:px-12 rounded-xl font-bold text-lg ${isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : "text-muted"}`}
