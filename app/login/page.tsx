@@ -5,6 +5,7 @@ import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { CustomInput } from "@/components/customInput";
+import { ThemeToggle } from "@/components/themeToggle";
 
 function SignIn(): JSX.Element {
     const [signInPassword, setSignInPassword] = useState<string>("");
@@ -159,40 +160,43 @@ export default function Login() {
     const isSignInTabSelected = () => activeTab === "Sign In";
 
     return (
-        <div className="h-screen w-screen bg-linear-to-r from-slate-950 via-blue-950 to-slate-950 flex overflow-scroll">
-            <div className="m-auto gap-5 flex flex-col">
+        <div className="max-sm:p-3 relative min-h-screen w-screen bg-linear-to-r from-cyan-50 via-blue-100 to-purple-100 dark:from-slate-950 dark:via-blue-950 dark:to-slate-950 flex overflow-scroll">
+            <div className="absolute top-4 right-4">
+                <ThemeToggle />
+            </div>
+            <div className="mx-auto mt-[5vh] mb-[2vh] gap-5 flex flex-col">
                 <div className="flex flex-col justify-center items-center">
-                    <span className="text-[50px] font-bold bg-linear-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                    <span className="text-4xl lg:text-[50px] font-bold bg-linear-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
                         Vistagram
                     </span>
-                    <span className="text-[#94A3B8] text-[16px]">
+                    <span className="text-muted text-sm md:text-[16px]">
                         Discover & Share Points of Interest
                     </span>
                 </div>
-                <div className="flex flex-col gap-6 bg-[#0F172A]/50 border border-[#06B6D4]/20 rounded-3xl p-8">
-                    <div className="bg-[#1E293B]/50 flex gap-10 rounded-xl">
+                <div className="flex flex-col gap-6 bg-surface/80 backdrop-blur-sm shadow-xl shadow-blue-200/50 dark:shadow-none border border-border rounded-3xl p-8">
+                    <div className="bg-surface-muted/50 flex gap-10 rounded-xl">
                         <button
                             onClick={() => setActiveTab("Sign In")}
-                            className={`cursor-pointer py-3 px-12 rounded-xl text-[#94A3B8] font-bold text-lg ${isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : ""}`}
+                            className={`cursor-pointer px-7 py-3 lg:py-3 lg:px-12 rounded-xl font-bold text-lg ${isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : "text-muted"}`}
                         >
                             Sign In
                         </button>
                         <button
                             onClick={() => setActiveTab("Sign Out")}
-                            className={`cursor-pointer py-3 px-12 rounded-xl text-[#94A3B8] font-bold text-lg ${!isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : ""}`}
+                            className={`cursor-pointer px-7 py-3 lg:py-3 lg:px-12 rounded-xl font-bold text-lg ${!isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : "text-muted"}`}
                         >
                             Sign Up
                         </button>
                     </div>
                     {activeTab === "Sign In" ? <SignIn /> : <SignUp />}
                     <div className="flex items-center gap-3">
-                        <div className="bg-slate-700 h-px w-full"></div>
-                        <span className="text-sm whitespace-nowrap text-slate-500">
+                        <div className="bg-border h-px w-full"></div>
+                        <span className="text-sm whitespace-nowrap text-muted">
                             Or continue with
                         </span>
-                        <div className="bg-slate-700 h-px w-full"></div>
+                        <div className="bg-border h-px w-full"></div>
                     </div>
-                    <button className="cursor-pointer w-full flex py-3 bg-[#1E293B]/50 border border-[#06B6D4]/20 rounded-xl justify-center">
+                    <button className="cursor-pointer w-full flex py-3 bg-surface-muted/50 border border-border rounded-xl justify-center">
                         <Image
                             alt="google logo"
                             src="/images/google.png"
