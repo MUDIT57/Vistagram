@@ -1,8 +1,13 @@
+import { Timestamp } from "firebase/firestore";
+
 export type Post = {
     id: string;
-    username: string;
-    userAvatar: string;
+    authorId: string;
+    authorName: string;
+    authorAvatar: string;
     image: string;
     caption: string;
-    timestamp: string;
+    createdAt: Timestamp | null;
+    likeCount: number;
+    commentCount: number;
 }

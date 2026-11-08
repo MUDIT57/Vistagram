@@ -1,5 +1,5 @@
 "use client";
-import { JSX, useState } from "react";
+import { JSX, useEffect, useState } from "react";
 import Image from "next/image";
 import { Mail, Lock, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
@@ -22,7 +22,7 @@ function SignIn(): JSX.Element {
             await logIn(signInEmailOrUsername, signInPassword);
             router.push("/feeds");
         } catch (e) {
-            console.log("Error in Sign In");
+            console.log("Error in Sign In", e);
         }
     };
 
@@ -35,12 +35,13 @@ function SignIn(): JSX.Element {
             className="flex flex-col gap-4"
         >
             <CustomInput
-                type="text"
+                leftIcon={<Mail size={22} />}
+                type="email"
                 isRequired={true}
-                text="Username"
+                text="Email"
                 value={signInEmailOrUsername}
                 onChange={(e) => setSignInEmailOrUsername(e.target.value)}
-                placeholder="Enter your username or email"
+                placeholder="Enter your email"
             />
             <CustomInput
                 onIconClick={toggleHidePassword}
@@ -81,13 +82,15 @@ function SignUp(): JSX.Element {
     const [hidePassword, setHidePassword] = useState<boolean>(true);
     const toggleHidePassword = () =>
         setHidePassword((hidePassword) => !hidePassword);
+    const router = useRouter();
     const { signUp, error } = useAuth();
 
     const handleSignUp = async () => {
         try {
-            await signUp(signUpEmail, signUpPassword,signUpconfirmPassword, signUpUserName);
-        } catch {
-            console.log("Error in Sign Up");
+            await signUp(signUpEmail, signUpPassword, signUpconfirmPassword, signUpUserName);
+            router.push("/feeds");
+        } catch (e) {
+            console.log("Error in Sign Up", e);
         }
     };
 
@@ -158,6 +161,17 @@ function SignUp(): JSX.Element {
 export default function Login() {
     const [activeTab, setActiveTab] = useState<string>("Sign In");
     const isSignInTabSelected = () => activeTab === "Sign In";
+    const { user, loading, clearError } = useAuth();
+    const router = useRouter();
+
+    useEffect(() => {
+        if (!loading && user) router.replace("/feeds");
+    }, [loading, user, router]);
+
+    const switchTab = (tab: string) => {
+        setActiveTab(tab);
+        clearError();
+    };
 
     return (
         <div className="max-sm:p-3 relative min-h-screen w-screen bg-linear-to-r from-cyan-50 via-blue-100 to-purple-100 dark:from-slate-950 dark:via-blue-950 dark:to-slate-950 flex overflow-scroll">
@@ -176,13 +190,13 @@ export default function Login() {
                 <div className="max-w-md flex flex-col gap-6 bg-surface/80 backdrop-blur-sm shadow-xl shadow-blue-200/50 dark:shadow-none border border-border rounded-3xl p-8">
                     <div className="bg-surface-muted/50 gap-10 rounded-xl flex justify-between">
                         <button
-                            onClick={() => setActiveTab("Sign In")}
+                            onClick={() => switchTab("Sign In")}
                             className={`cursor-pointer px-7 py-3 lg:py-3 lg:px-12 rounded-xl font-bold text-lg ${isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : "text-muted"}`}
                         >
                             Sign In
                         </button>
                         <button
-                            onClick={() => setActiveTab("Sign Out")}
+                            onClick={() => switchTab("Sign Up")}
                             className={`cursor-pointer px-7 py-3 lg:py-3 lg:px-12 rounded-xl font-bold text-lg ${!isSignInTabSelected() ? "text-white bg-linear-to-r from-[#06B6D4] to-[#3B82F6] shadow-md shadow-[#06B6D4]/50" : "text-muted"}`}
                         >
                             Sign Up
