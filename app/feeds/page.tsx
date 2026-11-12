@@ -1,11 +1,16 @@
 'use client'
-import { Camera, Clock, X, Upload, Sparkles } from 'lucide-react';
+import { Camera, X, Upload, Sparkles, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { Post } from '../type/posts';
-import { v4 as uuidv4 } from 'uuid';
-import { firebaseService } from '@/services/firebaseService';
 import { ThemeToggle } from '@/components/themeToggle';
+import { PostCard } from '@/components/postCard';
+import { SuggestedUsers } from '@/components/suggestedUsers';
+import { useAuth } from '@/hooks/useAuth';
+import { createPost } from '@/services/socialService';
+import { db } from '@/utils/firebase.browser';
 
 export default function Feeds() {
 
@@ -14,19 +19,54 @@ export default function Feeds() {
     const [stream, setStream] = useState<null | MediaStream>(null);
     const [imageUrl, setImageUrl] = useState<null | string>(null);
     const [caption, setCaption] = useState<string>("");
-    const [feeds, setFeeds] = useState<Post[]>([]);
+    const [captionError, setCaptionError] = useState<string | null>(null);
+    const [followingIds, setFollowingIds] = useState<string[]>([]);
+    const [postsByAuthor, setPostsByAuthor] = useState<Record<string, Post[]>>({});
     const imageInputRef = useRef<HTMLInputElement | null>(null)
+    const { user, loading, logout } = useAuth();
+    const router = useRouter();
+    const userId = user?.id;
 
-    const getPosts = async () => {
-        const data = await firebaseService.getAll<Post>("posts");
-        setFeeds(data);
-    }
+    const authorIds = userId ? [userId, ...followingIds] : [];
+    const authorKey = authorIds.join(",");
+
+    const feeds = authorIds
+        .flatMap((id) => postsByAuthor[id] ?? [])
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 
     useEffect(() => {
-        getPosts();
-    }, []);
+        if (!loading && !user) router.replace("/login");
+    }, [loading, user, router]);
+
+    useEffect(() => {
+        if (!userId) return;
+        return onSnapshot(
+            collection(db, "users", userId, "following"),
+            (snap) => setFollowingIds(snap.docs.map((d) => d.id)),
+            (err) => console.log("Following listener error", err)
+        );
+    }, [userId]);
+
+    useEffect(() => {
+        if (!authorKey) return;
+        const unsubscribes = authorKey.split(",").map((authorId) =>
+            onSnapshot(
+                query(collection(db, "users", authorId, "posts"), orderBy("createdAt", "desc"), limit(20)),
+                (snap) => {
+                    const posts = snap.docs.map((d) => ({
+                        ...(d.data({ serverTimestamps: "estimate" }) as Omit<Post, "id">),
+                        id: d.id,
+                    }));
+                    setPostsByAuthor((prev) => ({ ...prev, [authorId]: posts }));
+                },
+                (err) => console.log("Posts listener error", err)
+            )
+        );
+        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+    }, [authorKey]);
 
     const generateCaption = async () => {
+        setCaptionError(null);
         const response = await fetch("/api/ai-caption", {
             method: "POST",
             headers: {
@@ -36,29 +76,12 @@ export default function Feeds() {
                 image_url: imageUrl
             })
         });
-        const data = await response.json();
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+            setCaptionError(data?.error ?? "Couldn't generate a caption");
+            return;
+        }
         setCaption(data.caption);
-    }
-
-    function getTimeDifference(postedTime: string): string {
-        const currentTimeInSeconds = new Date().getTime() / 1000;
-        const postedTimeInSeconds = new Date(postedTime).getTime() / 1000;
-        const seconds = currentTimeInSeconds - postedTimeInSeconds;
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-        const years = Math.floor(days / 365);
-
-        if (seconds < 60)
-            return "Few second ago";
-        else if (minutes < 60)
-            return `${minutes} minutes ago`;
-        else if (hours < 24)
-            return `${hours} hours ago`;
-        else if (days < 365)
-            return `${days} days ago`;
-        else
-            return `${years} years ago`;
     }
 
     const openCamera = async () => {
@@ -68,7 +91,6 @@ export default function Feeds() {
             if (videoRef.current)
                 videoRef.current.srcObject = stream;
             setStream(stream);
-            console.log(stream.getTracks());
         }
         catch (err) {
             console.log("Error in opening video: ", err);
@@ -82,34 +104,28 @@ export default function Feeds() {
         setIsCameraOpen(false);
         setImageUrl(null);
         setCaption("");
+        setCaptionError(null);
     }
 
     const capturePhoto = () => {
         const videoElement = document.getElementById("videoElement") as HTMLVideoElement;
         const canvasElement: HTMLCanvasElement = document.createElement('canvas')
 
-        canvasElement.width = videoElement.videoWidth;
-        canvasElement.height = videoElement.videoHeight;
-        canvasElement.getContext("2d")?.drawImage(videoElement, 0, 0);
-        const photoDataUrl = canvasElement.toDataURL('image/jpeg');
+        canvasElement.width = 800;
+        canvasElement.height = 800 * videoElement.videoHeight / videoElement.videoWidth;
+        canvasElement.getContext("2d")?.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+        const photoDataUrl = canvasElement.toDataURL('image/jpeg', 0.7);
         setImageUrl(photoDataUrl);
     }
 
-    const generateUniqueId = (): string => uuidv4();
-
     const updateFeeds = async () => {
-        if (!imageUrl)
+        if (!imageUrl || !user)
             return;
-        const post: Post = {
-            id: generateUniqueId(),
-            username: "newUser",
-            userAvatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop",
-            image: imageUrl,
-            caption: caption,
-            timestamp: new Date().toISOString()
-        };
-        await firebaseService.add("posts", post);
-        getPosts();
+        try {
+            await createPost(user, imageUrl, caption);
+        } catch (e) {
+            console.log("Error sharing post", e);
+        }
     }
 
     const triggerImageUploadClick = () => {
@@ -118,12 +134,19 @@ export default function Feeds() {
     }
 
     const handleFileChnage = () => {
-        console.log(imageInputRef);
         const doc = imageInputRef.current as HTMLInputElement;
         const [input] = doc.files as FileList;
         const reader = new FileReader();
         reader.onload = (e) => {
-            setImageUrl(e.target?.result as string);
+            const img = new window.Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 800;
+                canvas.height = 800 * img.height / img.width;
+                canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+                setImageUrl(canvas.toDataURL('image/jpeg', 0.7));
+            }
+            img.src = e.target?.result as string;
         }
         reader.onerror = (e) => {
             console.log('error found: ', e);
@@ -131,17 +154,21 @@ export default function Feeds() {
         reader.readAsDataURL(input);
     }
 
+    if (loading || !user) {
+        return <div className='h-dvh flex items-center justify-center text-muted'>Loading…</div>;
+    }
+
     return <div className='flex flex-col h-screen overflow-hidden'>
         {isCameraOpen &&
-            <div className='fixed inset-0 z-50 flex items-center justify-center backdrop-blur-lg flex-col'>
-                <div className='border rounded-4xl overflow-hidden bg-surface border-border'>
+            <div className='max-sm:p-4 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-lg flex-col'>
+                <div className='max-w-133 w-full border rounded-4xl overflow-hidden bg-surface border-border'>
                     <div className='flex justify-between p-6 items-center border-b border-border'>
                         <span className='text-2xl font-bold bg-linear-to-r from-cyan-400 to-blue-400 text-transparent bg-clip-text'>Capture Moment</span>
                         <X className='text-foreground cursor-pointer' onClick={() => closeCamera()} />
                     </div>
                     {!imageUrl ? <video className='w-full aspect-4/3' ref={videoRef} autoPlay id="videoElement"></video> :
                         <Image width={30} height={30} alt="faceCam" className='w-full aspect-4/3' src={imageUrl} id="photoElement" />}
-                    {!imageUrl ? <div className='p-6 flex flex-col justify-center items-center gap-3 border-t border-border'>
+                    {!imageUrl ? <div className=' p-6 flex flex-col justify-center items-center gap-3 border-t border-border'>
                         <div className='flex gap-4'>
                             <button onClick={() => triggerImageUploadClick()} id="captureButton" className='cursor-pointer text-white flex bg-linear-to-r from-purple-500 to-pink-500 px-6 py-3 justify-center items-center gap-2 rounded-2xl'>
                                 <input ref={imageInputRef} onChange={() => handleFileChnage()} type="file" id="fileInput" accept="image/*" className="hidden" />
@@ -161,6 +188,7 @@ export default function Feeds() {
                                 AI Generate
                             </button>
                         </div>
+                        {captionError && <span className='block mt-2 text-sm text-red-500'>{captionError}</span>}
                         <textarea value={caption} onChange={(e) => setCaption(e.target.value)} placeholder='Describe your moment...' className='w-full h-32 bg-surface-muted rounded-2xl border-border border mt-2 text-foreground placeholder:text-placeholder p-4 focus:border-cyan-400 focus:outline-none' />
                         <button onClick={() => { closeCamera(); updateFeeds(); }} className='cursor-pointer mt-2 w-full bg-linear-to-r from-cyan-500 to-blue-500 rounded-4xl p-2 text-white'>Share to Feed</button>
                     </div>}
@@ -175,6 +203,13 @@ export default function Feeds() {
                 </div>
                 <div className='flex items-center gap-3'>
                     <ThemeToggle />
+                    <button
+                        onClick={logout}
+                        aria-label="Log out"
+                        className="cursor-pointer p-2 rounded-full border border-border bg-surface-muted text-foreground hover:scale-105 duration-200"
+                    >
+                        <LogOut size={20} />
+                    </button>
                     <button onClick={openCamera} className="flex gap-2 justify-center text-white items-center px-4 md:px-6 py-3 cursor-pointer rounded-4xl bg-linear-to-r from-[#06B6D4] to-[#3B82F6]">
                         <Camera size={15} />
                         <span className='text-sm md:text-[16px] font-semibold '>Capture</span>
@@ -184,37 +219,21 @@ export default function Feeds() {
         </header>
         <hr className='border-border' />
         <div className="bg-linear-to-b from-cyan-50 via-blue-100 to-purple-100 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950 overflow-y-auto px-8 lg:px-20">
-            <div className="grid grid-cols-1 gap-4 md:gap-8 py-10 md:grid-cols-2 lg:grid-cols-3">
-                {feeds.map((post) => (
-                    <div key={post.id} className="rounded-3xl overflow-hidden border-border border hover:shado-lg hover:shadow-[0px_10px_50px_rgba(6,182,212,0.25)] duration-300">
-                        <div className="relative w-full overflow-hidden aspect-4/3">
-                            <Image
-                                src={post.image}
-                                alt="User's post"
-                                fill
-                                className="object-cover transition-transform duration-700 hover:scale-110 "
-                            />
-                            <div className='absolute bottom-0 w-full h-24 bg-linear-to-t from-black/70 to-transparent'></div>
-                            <div className="absolute bottom-2 left-2 flex items-center gap-2 ">
-                                <Image
-                                    src={post.userAvatar}
-                                    alt="User"
-                                    width={40}
-                                    height={40}
-                                    className="rounded-full"
-                                />
-                                <div className="text-white text-xs">
-                                    <div className='text-sm font-bold'>{post.username}</div>
-                                    <div className="flex items-center gap-1 text-[#67E8F9]">
-                                        <Clock size={14} />
-                                        {getTimeDifference(post.timestamp)}
-                                    </div>
-                                </div>
-                            </div>
+            <div className="flex flex-col lg:flex-row-reverse gap-4 md:gap-8 py-10">
+                <div className="lg:w-72 shrink-0 lg:sticky lg:top-0 lg:self-start">
+                    <SuggestedUsers currentUser={user} followingIds={followingIds} />
+                </div>
+                <div className="flex-1">
+                    {feeds.length === 0 ? (
+                        <p className="text-muted text-center py-20">No posts yet. Capture a moment or follow someone to fill your feed.</p>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4 md:gap-8 md:grid-cols-2 xl:grid-cols-3">
+                            {feeds.map((post) => (
+                                <PostCard key={`${post.authorId}/${post.id}`} post={post} currentUserId={user.id} />
+                            ))}
                         </div>
-                        <div className="p-5 text-foreground text-sm bg-surface h-full wrap-break-word">{post.caption}</div>
-                    </div>
-                ))}
+                    )}
+                </div>
             </div>
         </div>
     </div >

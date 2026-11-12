@@ -1,7 +1,16 @@
 export type User={
+    id:string;
     userName:string;
     email:string;
-    password:string;
+    theme:string;
+    avatar:string;
+    followerCount:number;
+    followingCount:number;
+    postCount:number;
+}
+
+export type FollowEntry={
+    userName:string;
 }
 
 export type SignUpErrors={
