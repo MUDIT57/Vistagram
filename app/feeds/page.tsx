@@ -1,12 +1,15 @@
 'use client'
-import { Camera, Clock, X, Upload, Sparkles } from 'lucide-react';
+import { Camera, X, Upload, Sparkles, LogOut } from 'lucide-react';
 import Image from 'next/image';
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { collection, doc, increment, onSnapshot, orderBy, query, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, limit, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { Post } from '../type/posts';
 import { ThemeToggle } from '@/components/themeToggle';
+import { PostCard } from '@/components/postCard';
+import { SuggestedUsers } from '@/components/suggestedUsers';
 import { useAuth } from '@/hooks/useAuth';
+import { createPost } from '@/services/socialService';
 import { db } from '@/utils/firebase.browser';
 
 export default function Feeds() {
@@ -17,11 +20,19 @@ export default function Feeds() {
     const [imageUrl, setImageUrl] = useState<null | string>(null);
     const [caption, setCaption] = useState<string>("");
     const [captionError, setCaptionError] = useState<string | null>(null);
-    const [feeds, setFeeds] = useState<Post[]>([]);
+    const [followingIds, setFollowingIds] = useState<string[]>([]);
+    const [postsByAuthor, setPostsByAuthor] = useState<Record<string, Post[]>>({});
     const imageInputRef = useRef<HTMLInputElement | null>(null)
-    const { user, loading } = useAuth();
+    const { user, loading, logout } = useAuth();
     const router = useRouter();
     const userId = user?.id;
+
+    const authorIds = userId ? [userId, ...followingIds] : [];
+    const authorKey = authorIds.join(",");
+
+    const feeds = authorIds
+        .flatMap((id) => postsByAuthor[id] ?? [])
+        .sort((a, b) => (b.createdAt?.toMillis() ?? 0) - (a.createdAt?.toMillis() ?? 0));
 
     useEffect(() => {
         if (!loading && !user) router.replace("/login");
@@ -29,22 +40,30 @@ export default function Feeds() {
 
     useEffect(() => {
         if (!userId) return;
-        const postsQuery = query(
-            collection(db, "users", userId, "posts"),
-            orderBy("createdAt", "desc")
+        return onSnapshot(
+            collection(db, "users", userId, "following"),
+            (snap) => setFollowingIds(snap.docs.map((d) => d.id)),
+            (err) => console.log("Following listener error", err)
         );
-        const unsubscribe = onSnapshot(
-            postsQuery,
-            (snap) => {
-                setFeeds(snap.docs.map((d) => ({
-                    ...(d.data({ serverTimestamps: "estimate" }) as Omit<Post, "id">),
-                    id: d.id,
-                })));
-            },
-            (err) => console.log("Posts listener error", err)
-        );
-        return unsubscribe;
     }, [userId]);
+
+    useEffect(() => {
+        if (!authorKey) return;
+        const unsubscribes = authorKey.split(",").map((authorId) =>
+            onSnapshot(
+                query(collection(db, "users", authorId, "posts"), orderBy("createdAt", "desc"), limit(20)),
+                (snap) => {
+                    const posts = snap.docs.map((d) => ({
+                        ...(d.data({ serverTimestamps: "estimate" }) as Omit<Post, "id">),
+                        id: d.id,
+                    }));
+                    setPostsByAuthor((prev) => ({ ...prev, [authorId]: posts }));
+                },
+                (err) => console.log("Posts listener error", err)
+            )
+        );
+        return () => unsubscribes.forEach((unsubscribe) => unsubscribe());
+    }, [authorKey]);
 
     const generateCaption = async () => {
         setCaptionError(null);
@@ -63,27 +82,6 @@ export default function Feeds() {
             return;
         }
         setCaption(data.caption);
-    }
-
-    function getTimeDifference(postedTime: Date): string {
-        const currentTimeInSeconds = new Date().getTime() / 1000;
-        const postedTimeInSeconds = postedTime.getTime() / 1000;
-        const seconds = currentTimeInSeconds - postedTimeInSeconds;
-        const minutes = Math.floor(seconds / 60);
-        const hours = Math.floor(minutes / 60);
-        const days = Math.floor(hours / 24);
-        const years = Math.floor(days / 365);
-
-        if (seconds < 60)
-            return "Few second ago";
-        else if (minutes < 60)
-            return `${minutes} minutes ago`;
-        else if (hours < 24)
-            return `${hours} hours ago`;
-        else if (days < 365)
-            return `${days} days ago`;
-        else
-            return `${years} years ago`;
     }
 
     const openCamera = async () => {
@@ -123,21 +121,8 @@ export default function Feeds() {
     const updateFeeds = async () => {
         if (!imageUrl || !user)
             return;
-        const batch = writeBatch(db);
-        const postRef = doc(collection(db, "users", user.id, "posts"));
-        batch.set(postRef, {
-            authorId: user.id,
-            authorName: user.userName,
-            authorAvatar: user.avatar,
-            image: imageUrl,
-            caption: caption,
-            createdAt: serverTimestamp(),
-            likeCount: 0,
-            commentCount: 0,
-        });
-        batch.update(doc(db, "users", user.id), { postCount: increment(1) });
         try {
-            await batch.commit();
+            await createPost(user, imageUrl, caption);
         } catch (e) {
             console.log("Error sharing post", e);
         }
@@ -218,6 +203,13 @@ export default function Feeds() {
                 </div>
                 <div className='flex items-center gap-3'>
                     <ThemeToggle />
+                    <button
+                        onClick={logout}
+                        aria-label="Log out"
+                        className="cursor-pointer p-2 rounded-full border border-border bg-surface-muted text-foreground hover:scale-105 duration-200"
+                    >
+                        <LogOut size={20} />
+                    </button>
                     <button onClick={openCamera} className="flex gap-2 justify-center text-white items-center px-4 md:px-6 py-3 cursor-pointer rounded-4xl bg-linear-to-r from-[#06B6D4] to-[#3B82F6]">
                         <Camera size={15} />
                         <span className='text-sm md:text-[16px] font-semibold '>Capture</span>
@@ -227,39 +219,21 @@ export default function Feeds() {
         </header>
         <hr className='border-border' />
         <div className="bg-linear-to-b from-cyan-50 via-blue-100 to-purple-100 dark:from-slate-950 dark:via-slate-950 dark:to-blue-950 overflow-y-auto px-8 lg:px-20">
-            <div className="grid grid-cols-1 gap-4 md:gap-8 py-10 md:grid-cols-2 lg:grid-cols-3">
-                {feeds.map((post) => (
-                    <div key={post.id} className="rounded-3xl overflow-hidden border-border border hover:shado-lg hover:shadow-[0px_10px_50px_rgba(6,182,212,0.25)] duration-300">
-                        <div className="relative w-full overflow-hidden aspect-4/3">
-                            <Image
-                                src={post.image}
-                                alt="User's post"
-                                fill
-                                className="object-cover transition-transform duration-700 hover:scale-110 "
-                            />
-                            <div className='absolute bottom-0 w-full h-24 bg-linear-to-t from-black/70 to-transparent'></div>
-                            <div className="absolute bottom-2 left-2 flex items-center gap-2 ">
-                                <Image
-                                    src={post.authorAvatar}
-                                    alt="User"
-                                    width={40}
-                                    height={40}
-                                    className="rounded-full"
-                                />
-                                <div className="text-white text-xs">
-                                    <div className='text-sm font-bold'>{post.authorName}</div>
-                                    {post.createdAt && (
-                                        <div className="flex items-center gap-1 text-[#67E8F9]">
-                                            <Clock size={14} />
-                                            {getTimeDifference(post.createdAt.toDate())}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+            <div className="flex flex-col lg:flex-row-reverse gap-4 md:gap-8 py-10">
+                <div className="lg:w-72 shrink-0 lg:sticky lg:top-0 lg:self-start">
+                    <SuggestedUsers currentUser={user} followingIds={followingIds} />
+                </div>
+                <div className="flex-1">
+                    {feeds.length === 0 ? (
+                        <p className="text-muted text-center py-20">No posts yet. Capture a moment or follow someone to fill your feed.</p>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4 md:gap-8 md:grid-cols-2 xl:grid-cols-3">
+                            {feeds.map((post) => (
+                                <PostCard key={`${post.authorId}/${post.id}`} post={post} currentUserId={user.id} />
+                            ))}
                         </div>
-                        <div className="p-5 text-foreground text-sm bg-surface h-full wrap-break-word">{post.caption}</div>
-                    </div>
-                ))}
+                    )}
+                </div>
             </div>
         </div>
     </div >
